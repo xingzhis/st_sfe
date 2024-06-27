@@ -23,6 +23,12 @@ def get_markers(pattern_list, adata, max_markers=100, sort_by_dispersion=True, s
     markers = markers[:max_markers]
     return markers
 
+def get_markers_from_var_names(pattern_list, var_names, start=True, end=False):
+    markers = []
+    for g in pattern_list:
+        markers += find_genes(g, var_names, start=start, end=end)
+    return markers
+
 def get_proliferation_score_cell_cycle(adata):
     with pkg_resources.open_binary(reference, 'WOT_genesets.xlsx') as excel_file:
         proliferation_genes = pd.read_excel(excel_file)["Proliferation"].dropna()
