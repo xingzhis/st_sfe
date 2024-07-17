@@ -1,6 +1,7 @@
 import re
 import scanpy as sc
 import pandas as pd
+import numpy as np
 import json
 import importlib.resources as pkg_resources
 from stfe import reference
@@ -44,6 +45,62 @@ def get_proliferation_score_cell_cycle(adata):
     sc.tl.score_genes_cell_cycle(adata, s_genes=s_genes, g2m_genes=g2m_genes)
     scores_df = sc.get.obs_df(adata, ['phase', 'S_score', 'G2M_score', 'proliferation_score'])
     return scores_df
+
+def get_emt_score(adata):
+    EMT_genes = [
+        'ZEB1',
+        'LIX1L',
+        'VIM',
+        'AXL',
+        'MMP2',
+        'ANTXR2', 
+        #'C3orf21', 
+        'FN1',
+        'NRP1',
+        'TGFBI',
+        'GALNT5',
+        'PPARG',
+        'HNMT',
+        'CARD6', 
+        'RBPMS',
+        'TNFRSF21',
+        'TMEM45B',
+        'MPP7', 'SSH3', 
+        #'MTAC2D1', 
+        #'MUC', 
+        'EPPK1', 'SHROOM3', 'EPN3', 'PRSS22', 'AP1M2', 
+        'SH3YL1', 'KLC3', 'SERINC2', 
+        #'EBPM', 
+        'FXYD3', 'CLDN4', 
+        'CRB3', 
+        #'LRRC54', 
+        'MAPK13', 'GALNT3', 'STAP2', 'AP1M2', 'DSP', 'ELMO3', 
+        'KRTCAP3', 'MAL2', 'F11R', 
+        #'GPR110', 
+        #'GPR56', 
+        'KRT19', 'GRHL1', 'BSPRY', 
+        'C1orf116', 'S100A14', 'SPINT2', 'ANKRD22', 'ST14', 'GRHL2', 'PRR5', 
+        'BSPRY', 'TJP3', 'TACSTD2', 'CDH3', 
+        #'C1orf172', 
+        'CDS1', 
+        'MPZL2', 
+        #'INADL', 
+        'EPN3', 
+        #'RBM35A', 
+        'TMC4', 'ITGB6', 'TMEM125', 
+        'EPHA1', 'CDS1', 
+        'ENPP5', 'ST14', 'EPB41L5', 'ERBB3', 'RAB25', 
+        'PRSS8', 'TMEM30B', 'CLDN7', 
+        #'RBM35A', 
+        #'TACSTD1', 
+        'CDS1', 'SCNN1A',
+        'CDH1',
+    ]
+    emt_expr = sc.get.obs_df(adata, keys=EMT_genes)
+    ecad_expr = sc.get.obs_df(adata, keys=['CDH1'])
+    weights = emt_expr.corr()[['CDH1']]
+    emt_scores = pd.DataFrame((np.array(emt_expr) * np.array(weights).T), index=emt_expr.index, columns=emt_expr.columns).sum(axis=1)
+    return emt_scores
 
 def get_genes_from_json(json_file, adata, max_markers=1000, start=True, end=False):
     with open(json_file, 'r') as file:
