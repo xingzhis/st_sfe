@@ -11,7 +11,7 @@ def transform_spatial(spatial_dict):
     preproc_list = []
     for key, value in spatial_dict.items():
         feat_df = value.copy()
-        assert not feat_df.isna().any(), f"{key} contains nan!"
+        assert not feat_df.isna().any().any(), f"{key} contains nan!"
         if key.endswith('_percentages'):
             # feat_df = feat_df.drop(feat_df.columns[-1], axis=1)
             feat_df = feat_df.applymap(lambda x: np.sqrt(x + 1e-7)) # take sqrt instead
