@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='stfe',
-    version='0.1.2',
+    version='0.1.3',
     # packages=find_packages(where='stfe'),
     packages=find_packages(),
     # package_dir={'': 'stfe'},

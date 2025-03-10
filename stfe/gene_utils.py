@@ -6,43 +6,58 @@ import json
 import importlib.resources as pkg_resources
 from stfe import reference
 
-def find_genes(nameptrn, gene_list, start=True, end=False):
+def find_genes(nameptrn, gene_list, start=True, end=False, verbose=False):
+    nameptrn_0 = nameptrn
     if start:
         nameptrn = f"^{nameptrn}"
     if end:
         nameptrn = f"{nameptrn}$"
     pattern = re.compile(nameptrn, re.IGNORECASE)
     filtered_strings = [string for string in gene_list if pattern.search(string)]
+    if verbose:
+        if len(filtered_strings) == 0:
+            print(f"{nameptrn_0} NOT FOUND!")
     return filtered_strings
 
-def get_markers(pattern_list, adata, max_markers=100, sort_by_dispersion=True, start=True, end=False):
+def get_markers(pattern_list, adata, max_markers=100, sort_by_dispersion=True, start=True, end=False, verbose=False):
     markers = []
     for g in pattern_list:
-        markers += find_genes(g, adata.var_names, start=start, end=end)
+        markers += find_genes(g, adata.var_names, start=start, end=end, verbose=verbose)
     if sort_by_dispersion:
         markers = adata.var['dispersions_norm'][markers].sort_values(ascending=False).index
     markers = markers[:max_markers]
     return markers
 
-def get_markers_from_var_names(pattern_list, var_names, start=True, end=False):
+def get_markers_from_var_names(pattern_list, var_names, start=True, end=False, verbose=False):
     markers = []
     for g in pattern_list:
-        markers += find_genes(g, var_names, start=start, end=end)
+        markers += find_genes(g, var_names, start=start, end=end, verbose=verbose)
     return markers
 
 def get_proliferation_score_cell_cycle(adata):
     with pkg_resources.open_binary(reference, 'WOT_genesets.xlsx') as excel_file:
         proliferation_genes = pd.read_excel(excel_file)["Proliferation"].dropna()
     proliferation_genes = pd.Series([p.upper() for p in proliferation_genes])
-
-    sc.tl.score_genes(adata, proliferation_genes, score_name="proliferation_score")
+    proliferation_genes_intersect = get_markers_from_var_names(proliferation_genes, adata.var_names, start=True, end=True, verbose=True)
+    if len(proliferation_genes_intersect) != len(proliferation_genes):
+        print(f"WARNING: Some proliferation genes missing. Got {len(proliferation_genes_intersect)}/{len(proliferation_genes)}.")
+    sc.tl.score_genes(adata, proliferation_genes_intersect, score_name="proliferation_score")
 
     with pkg_resources.open_text(reference, 'regev_lab_cell_cycle_genes.txt') as txt_file:
         cell_cycle_genes = [x.strip() for x in txt_file]
     s_genes = cell_cycle_genes[:43]
+    s_genes_intersect = get_markers_from_var_names(s_genes, adata.var_names, start=True, end=True, verbose=True)
+    if len(s_genes_intersect) != len(s_genes):
+        print(f"WARNING: Some S genes missing. Got {len(s_genes_intersect)}/{len(s_genes)}.")
     g2m_genes = cell_cycle_genes[43:]
-    cell_cycle_genes = [x for x in cell_cycle_genes if x in adata.var_names]
-    sc.tl.score_genes_cell_cycle(adata, s_genes=s_genes, g2m_genes=g2m_genes)
+    g2m_genes_intersect = get_markers_from_var_names(g2m_genes, adata.var_names, start=True, end=True, verbose=True)
+    if len(g2m_genes_intersect) != len(g2m_genes):
+        print(f"WARNING: Some G2M genes missing. Got {len(g2m_genes_intersect)}/{len(g2m_genes)}.")
+    # cell_cycle_genes_intersect = get_markers_from_var_names(cell_cycle_genes, adata.var_names, start=True, end=True, verbose=True)
+    # if len(cell_cycle_genes_intersect) != len(cell_cycle_genes):
+    #     print(f"WARNING: Some cell cycle genes missing. Got {len(cell_cycle_genes_intersect)}/{len(cell_cycle_genes)}.")
+
+    sc.tl.score_genes_cell_cycle(adata, s_genes=s_genes_intersect, g2m_genes=g2m_genes_intersect)
     scores_df = sc.get.obs_df(adata, ['phase', 'S_score', 'G2M_score', 'proliferation_score'])
     return scores_df
 
@@ -96,9 +111,12 @@ def get_emt_score(adata):
         'CDS1', 'SCNN1A',
         'CDH1',
     ]
-    emt_expr = sc.get.obs_df(adata, keys=EMT_genes)
-    ecad_expr = sc.get.obs_df(adata, keys=['CDH1'])
-    weights = emt_expr.corr()[['CDH1']]
+    EMT_genes_intersect = get_markers_from_var_names(EMT_genes, adata.var_names, start=True, end=True, verbose=True)
+    if len(EMT_genes_intersect) != len(EMT_genes):
+        print(f"WARNING: Some EMT genes missing. Got {len(EMT_genes_intersect)}/{len(EMT_genes)}.")
+    emt_expr = sc.get.obs_df(adata, keys=EMT_genes_intersect)
+    ecad_expr = sc.get.obs_df(adata, keys=get_markers_from_var_names(['CDH1'], adata.var_names, start=True, end=True))
+    weights = emt_expr.corr()[get_markers_from_var_names(['CDH1'], adata.var_names, start=True, end=True)]
     emt_scores = pd.DataFrame((np.array(emt_expr) * np.array(weights).T), index=emt_expr.index, columns=emt_expr.columns).sum(axis=1)
     return emt_scores
 
